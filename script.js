@@ -71,24 +71,27 @@
   function featherRim(canvas) {
     const w = canvas.width;
     const h = canvas.height;
-    const radius = Math.max(10, Math.min(22, Math.round(Math.min(w, h) * 0.075)));
-    const pad = Math.ceil(radius * 2.6);
+    const radius = Math.max(16, Math.min(34, Math.round(Math.min(w, h) * 0.11)));
+    const pad = Math.ceil(radius * 3);
     const out = document.createElement("canvas");
     out.width = w + pad * 2;
     out.height = h + pad * 2;
     const ctx = out.getContext("2d");
-    ctx.filter = `blur(${(radius * 1.35).toFixed(1)}px)`;
-    ctx.globalAlpha = 0.62;
+    ctx.filter = `blur(${(radius * 1.7).toFixed(1)}px)`;
+    ctx.globalAlpha = 0.5;
     ctx.drawImage(canvas, pad, pad);
-    ctx.filter = `blur(${(radius * 0.28).toFixed(1)}px)`;
-    ctx.globalAlpha = 0.92;
+    ctx.filter = `blur(${(radius * 0.55).toFixed(1)}px)`;
+    ctx.globalAlpha = 0.78;
+    ctx.drawImage(canvas, pad, pad);
+    ctx.filter = `blur(${(radius * 0.18).toFixed(1)}px)`;
+    ctx.globalAlpha = 0.88;
     ctx.drawImage(canvas, pad, pad);
 
     const halo = document.createElement("canvas");
     halo.width = out.width;
     halo.height = out.height;
     const hctx = halo.getContext("2d");
-    hctx.filter = `blur(${Math.max(8, radius * 0.9).toFixed(1)}px)`;
+    hctx.filter = `blur(${Math.max(12, radius * 1.15).toFixed(1)}px)`;
     hctx.drawImage(out, 0, 0);
     const image = ctx.getImageData(0, 0, out.width, out.height);
     const fade = hctx.getImageData(0, 0, out.width, out.height).data;
@@ -96,8 +99,10 @@
     for (let i = 0; i < d.length; i += 4) {
       if (!d[i + 3]) continue;
       const t = fade[i + 3] / 255;
-      const edge = t > 0.82 ? 1 : Math.pow(t / 0.82, 1.45);
-      d[i + 3] = Math.round(d[i + 3] * edge * 0.9);
+      const edge = t > 0.72 ? 1 : Math.pow(t / 0.72, 1.85);
+      const lum = (d[i] * 0.32 + d[i + 1] * 0.5 + d[i + 2] * 0.18) / 255;
+      const ink = Math.max(0.2, 1 - lum);
+      d[i + 3] = Math.round(d[i + 3] * edge * (0.38 + ink * 0.52));
     }
     ctx.putImageData(image, 0, 0);
     return out;
@@ -591,7 +596,7 @@
     const wrap = document.createElement("div");
     wrap.className = "bruise-wrap";
     wrap.style.setProperty("--bruise-rot", `${rotation}deg`);
-    wrap.style.setProperty("--bruise-opacity", randomBetween(0.7, 0.86).toFixed(2));
+    wrap.style.setProperty("--bruise-opacity", randomBetween(0.62, 0.8).toFixed(2));
     wrap.style.setProperty("--bruise-in", `${randomBetween(4.4, 6.2).toFixed(2)}s`);
     Object.assign(wrap.style, {
       left: `${x}px`,
