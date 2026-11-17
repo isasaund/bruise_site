@@ -26,10 +26,126 @@
     return x * x * (3 - 2 * x);
   };
 
-  function presentInk(ctx, ink) {
+  function presentInk(ctx, ink, skipRestamp) {
+    const canvas = ctx.canvas;
+    canvas._ink = ink;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = "source-over";
-    ctx.putImageData(ink, 0, 0);
+    ctx.putImageData(deepenOverlap(canvas, ink), 0, 0);
+    if (skipRestamp) return;
+    overlappingCanvases(canvas).forEach((other) => {
+      if (!other._ink) return;
+      presentInk(other.getContext("2d", { willReadFrequently: true }), other._ink, true);
+    });
+  }
+
+  function overlappingCanvases(canvas) {
+    const wrap = canvas.parentElement;
+    const layer = wrap && wrap.parentElement;
+    if (!layer) return [];
+    const a = wrap.getBoundingClientRect();
+    return [...layer.querySelectorAll("canvas")].filter((other) => {
+      if (other === canvas || !other._ink || !other.parentElement) return false;
+      const b = other.parentElement.getBoundingClientRect();
+      return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
+    });
+  }
+
+  function sampleInk(canvas, wx, wy) {
+    const ink = canvas._ink;
+    if (!ink) return null;
+    const w = ink.width;
+    const h = ink.height;
+    const rad = (canvas._rot || 0) * Math.PI / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    const dx = wx - (canvas._ox || 0);
+    const dy = wy - (canvas._oy || 0);
+    const x = dx * cos + dy * sin + w / 2;
+    const y = -dx * sin + dy * cos + h / 2;
+    if (x < 0 || y < 0 || x > w - 1 || y > h - 1) return null;
+    const x0 = Math.floor(x);
+    const y0 = Math.floor(y);
+    const x1 = Math.min(w - 1, x0 + 1);
+    const y1 = Math.min(h - 1, y0 + 1);
+    const fx = x - x0;
+    const fy = y - y0;
+    const pix = ink.data;
+    const at = (ix, iy) => (iy * w + ix) * 4;
+    const i00 = at(x0, y0);
+    const i10 = at(x1, y0);
+    const i01 = at(x0, y1);
+    const i11 = at(x1, y1);
+    const mix = (p, q, t) => p + (q - p) * t;
+    const a = mix(mix(pix[i00 + 3], pix[i10 + 3], fx), mix(pix[i01 + 3], pix[i11 + 3], fx), fy);
+    if (a < 10) return null;
+    return [
+      mix(mix(pix[i00], pix[i10], fx), mix(pix[i01], pix[i11], fx), fy),
+      mix(mix(pix[i00 + 1], pix[i10 + 1], fx), mix(pix[i01 + 1], pix[i11 + 1], fx), fy),
+      mix(mix(pix[i00 + 2], pix[i10 + 2], fx), mix(pix[i01 + 2], pix[i11 + 2], fx), fy),
+      a
+    ];
+  }
+
+  function deepenOverlap(canvas, ink) {
+    const others = overlappingCanvases(canvas);
+    if (!others.length) return ink;
+    const w = ink.width;
+    const h = ink.height;
+    const src = ink.data;
+    const out = new ImageData(w, h);
+    const dst = out.data;
+    const ox = canvas._ox || 0;
+    const oy = canvas._oy || 0;
+    const rad = (canvas._rot || 0) * Math.PI / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    for (let y = 0; y < h; y += 1) {
+      for (let x = 0; x < w; x += 1) {
+        const p = (y * w + x) * 4;
+        const a = src[p + 3];
+        dst[p] = src[p];
+        dst[p + 1] = src[p + 1];
+        dst[p + 2] = src[p + 2];
+        dst[p + 3] = a;
+        if (!a) continue;
+        const lx = x - w / 2;
+        const ly = y - h / 2;
+        const wx = ox + lx * cos - ly * sin;
+        const wy = oy + lx * sin + ly * cos;
+        let cover = 0;
+        let mixR = 0;
+        let mixG = 0;
+        let mixB = 0;
+        for (let i = 0; i < others.length; i += 1) {
+          const s = sampleInk(others[i], wx, wy);
+          if (!s) continue;
+          cover += s[3];
+          mixR += s[0] * s[3];
+          mixG += s[1] * s[3];
+          mixB += s[2] * s[3];
+        }
+        if (cover < 12) continue;
+        const t = Math.min(1, cover / 220);
+        const oR = mixR / cover;
+        const oG = mixG / cover;
+        const oB = mixB / cover;
+        let r = src[p] * (1 - 0.38 * t) + (src[p] * oR / 255) * 0.38 * t;
+        let g = src[p + 1] * (1 - 0.38 * t) + (src[p + 1] * oG / 255) * 0.38 * t;
+        let b = src[p + 2] * (1 - 0.38 * t) + (src[p + 2] * oB / 255) * 0.38 * t;
+        const hsl = rgbToHsl(r / 255, g / 255, b / 255);
+        const rgb = hslToRgb(
+          (hsl[0] + 1 - 0.025 * t) % 1,
+          Math.min(1, hsl[1] * (1.28 + 0.55 * t)),
+          Math.max(0.05, hsl[2] * (1 - 0.32 * t))
+        );
+        dst[p] = rgb[0];
+        dst[p + 1] = rgb[1];
+        dst[p + 2] = rgb[2];
+        dst[p + 3] = Math.min(255, a * (1 + 0.22 * t));
+      }
+    }
+    return out;
   }
 
   function blurCanvas(canvas, radius) {
