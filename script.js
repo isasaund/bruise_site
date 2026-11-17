@@ -26,101 +26,9 @@
     return x * x * (3 - 2 * x);
   };
 
-  let skinImage = null;
-  let inkScratch = null;
-
-  function loadSkinMap() {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        skinImage = img;
-        resolve();
-      };
-      img.onerror = () => resolve();
-      img.src = "skin.jpg";
-    });
-  }
-
-  function skinTileSize() {
-    const el = document.querySelector("#skin-world");
-    const parts = (el ? getComputedStyle(el).backgroundSize : "170vw auto").trim().split(/\s+/);
-    const parseLen = (raw, fallback) => {
-      if (!raw || raw === "auto") return fallback;
-      if (raw.endsWith("vw")) return window.innerWidth * (parseFloat(raw) / 100);
-      if (raw.endsWith("vh")) return window.innerHeight * (parseFloat(raw) / 100);
-      const n = parseFloat(raw);
-      return Number.isFinite(n) && n > 0 ? n : fallback;
-    };
-    const tileW = parseLen(parts[0], window.innerWidth * 1.7);
-    const ratio = skinImage
-      ? skinImage.naturalHeight / skinImage.naturalWidth
-      : 1;
-    const tileH = parseLen(parts[1], tileW * ratio);
-    return { tileW, tileH };
-  }
-
-  function getInkScratch(w, h) {
-    if (!inkScratch || inkScratch.width !== w || inkScratch.height !== h) {
-      inkScratch = document.createElement("canvas");
-      inkScratch.width = w;
-      inkScratch.height = h;
-    }
-    return inkScratch;
-  }
-
-  function drawAlignedSkin(ctx, canvas) {
-    const { tileW, tileH } = skinTileSize();
-    const ox = canvas._ox || 0;
-    const oy = canvas._oy || 0;
-    const rad = (canvas._rot || 0) * Math.PI / 180;
-    const cos = Math.cos(rad);
-    const sin = Math.sin(rad);
-    const w = canvas.width;
-    const h = canvas.height;
-    ctx.save();
-    ctx.setTransform(
-      cos,
-      -sin,
-      sin,
-      cos,
-      w / 2 - ox * cos - oy * sin,
-      h / 2 + ox * sin - oy * cos
-    );
-    if (!(tileW > 1 && tileH > 1)) {
-      ctx.restore();
-      return;
-    }
-    const pad = Math.hypot(w, h);
-    const x0 = Math.floor((ox - pad) / tileW) * tileW;
-    const y0 = Math.floor((oy - pad) / tileH) * tileH;
-    const x1 = ox + pad;
-    const y1 = oy + pad;
-    for (let ty = y0; ty < y1; ty += tileH) {
-      for (let tx = x0; tx < x1; tx += tileW) {
-        ctx.drawImage(skinImage, tx, ty, tileW, tileH);
-      }
-    }
-    ctx.restore();
-  }
-
   function presentInk(ctx, ink) {
-    const canvas = ctx.canvas;
-    const w = ink.width;
-    const h = ink.height;
-    const scratch = getInkScratch(w, h);
-    scratch.getContext("2d").putImageData(ink, 0, 0);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = "source-over";
-    ctx.clearRect(0, 0, w, h);
-    if (skinImage) {
-      drawAlignedSkin(ctx, canvas);
-      ctx.globalCompositeOperation = "multiply";
-      ctx.drawImage(scratch, 0, 0);
-      ctx.globalCompositeOperation = "destination-in";
-      ctx.drawImage(scratch, 0, 0);
-      ctx.globalCompositeOperation = "source-over";
-      return;
-    }
     ctx.putImageData(ink, 0, 0);
   }
 
@@ -768,7 +676,7 @@
     if (world.dataset.bruiseClickReady === "true") return;
     world.dataset.bruiseClickReady = "true";
     layer.style.pointerEvents = "none";
-    const sourcesReady = Promise.all([loadSources(), loadSkinMap()]).then(([sources]) => sources);
+    const sourcesReady = loadSources();
 
     world.addEventListener("click", (event) => {
       if (event.target.closest("button, a, input, textarea, select")) return;
