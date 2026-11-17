@@ -71,24 +71,24 @@
   function featherRim(canvas) {
     const w = canvas.width;
     const h = canvas.height;
-    const radius = Math.max(12, Math.min(26, Math.round(Math.min(w, h) * 0.09)));
-    const pad = Math.ceil(radius * 2.8);
+    const radius = Math.max(10, Math.min(22, Math.round(Math.min(w, h) * 0.075)));
+    const pad = Math.ceil(radius * 2.6);
     const out = document.createElement("canvas");
     out.width = w + pad * 2;
     out.height = h + pad * 2;
     const ctx = out.getContext("2d");
-    ctx.filter = `blur(${(radius * 1.5).toFixed(1)}px)`;
-    ctx.globalAlpha = 0.58;
+    ctx.filter = `blur(${(radius * 1.35).toFixed(1)}px)`;
+    ctx.globalAlpha = 0.62;
     ctx.drawImage(canvas, pad, pad);
-    ctx.filter = `blur(${(radius * 0.32).toFixed(1)}px)`;
-    ctx.globalAlpha = 0.9;
+    ctx.filter = `blur(${(radius * 0.28).toFixed(1)}px)`;
+    ctx.globalAlpha = 0.92;
     ctx.drawImage(canvas, pad, pad);
 
     const halo = document.createElement("canvas");
     halo.width = out.width;
     halo.height = out.height;
     const hctx = halo.getContext("2d");
-    hctx.filter = `blur(${Math.max(10, radius * 1.05).toFixed(1)}px)`;
+    hctx.filter = `blur(${Math.max(8, radius * 0.9).toFixed(1)}px)`;
     hctx.drawImage(out, 0, 0);
     const image = ctx.getImageData(0, 0, out.width, out.height);
     const fade = hctx.getImageData(0, 0, out.width, out.height).data;
@@ -96,8 +96,8 @@
     for (let i = 0; i < d.length; i += 4) {
       if (!d[i + 3]) continue;
       const t = fade[i + 3] / 255;
-      const edge = t > 0.78 ? 1 : Math.pow(t / 0.78, 1.6);
-      d[i + 3] = Math.round(d[i + 3] * edge * 0.88);
+      const edge = t > 0.82 ? 1 : Math.pow(t / 0.82, 1.45);
+      d[i + 3] = Math.round(d[i + 3] * edge * 0.9);
     }
     ctx.putImageData(image, 0, 0);
     return out;
@@ -512,15 +512,11 @@
   }
 
   function startDevelopment(canvas) {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    let final;
-    try {
-      final = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    } catch (err) {
-      canvas._stopDevelop = () => {};
-      return;
-    }
+    const final = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const src = final.data;
+    if (reduce) return;
     const frame = ctx.createImageData(canvas.width, canvas.height);
     const out = frame.data;
     const duration = randomBetween(4200, 6400);
@@ -588,22 +584,24 @@
 
   function placeBruise(layer, bruise, x, y) {
     const rotation = randomBetween(-18, 18);
-    const wrap = document.createElement("div");
-    wrap.className = "bruise-wrap";
-    wrap.style.setProperty("--bruise-rot", `${rotation}deg`);
-    wrap.style.setProperty("--bruise-opacity", randomBetween(0.7, 0.86).toFixed(2));
-    wrap.style.setProperty("--bruise-in", `${randomBetween(4.4, 6.2).toFixed(2)}s`);
-    Object.assign(wrap.style, {
+    const placedTransform = `translate(-50%, -50%) rotate(${rotation}deg)`;
+    bruise.className = "bruise placed-bruise";
+    bruise.style.setProperty("--bruise-opacity", randomBetween(0.7, 0.86).toFixed(2));
+    bruise.style.setProperty("--bruise-transform", placedTransform);
+    bruise.style.setProperty("--bruise-in", `${randomBetween(4.4, 6.2).toFixed(2)}s`);
+    Object.assign(bruise.style, {
+      position: "absolute",
+      display: "block",
+      width: `${bruise.width}px`,
+      height: `${bruise.height}px`,
       left: `${x}px`,
       top: `${y}px`,
-      width: `${bruise.width}px`,
-      height: `${bruise.height}px`
+      transform: placedTransform,
+      transformOrigin: "center",
+      pointerEvents: "none",
+      userSelect: "none"
     });
-    bruise.className = "bruise placed-bruise";
-    bruise.style.setProperty("--bruise-opacity", wrap.style.getPropertyValue("--bruise-opacity"));
-    bruise.style.setProperty("--bruise-in", wrap.style.getPropertyValue("--bruise-in"));
-    wrap.appendChild(bruise);
-    layer.appendChild(wrap);
+    layer.appendChild(bruise);
     startDevelopment(bruise);
   }
 

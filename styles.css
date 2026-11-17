@@ -6,24 +6,17 @@ body {
   cursor: crosshair;
   font-family: Arial, sans-serif;
 }
+/* skin.jpg is a seamless photographic texture. It repeats across the large canvas. */
 #skin-world {
   position: relative;
   width: 300vw;
   min-width: 1800px;
   min-height: 300vh;
   background-color: #b99174;
-  overflow: hidden;
-  isolation: isolate;
-}
-#skin-bg {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  background-color: #b99174;
   background-image: url("skin.jpg");
   background-repeat: repeat;
-  background-size: 1310px auto;
-  pointer-events: none;
+  background-size: 170vw auto;
+  overflow: hidden;
 }
 #clear-bruises {
   position: fixed;
@@ -39,36 +32,23 @@ body {
   cursor: pointer;
 }
 #clear-bruises:hover { background: rgba(35,20,18,.75); }
-#bruise-layer {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  mix-blend-mode: multiply;
-}
-.bruise-wrap {
-  position: absolute;
-  pointer-events: none;
-  user-select: none;
-  background: transparent;
-  transform: translate(-50%, -50%) rotate(var(--bruise-rot, 0deg));
-  transform-origin: center;
-}
+#bruise-layer { position: absolute; inset: 0; pointer-events: none; }
 .bruise {
+  position: absolute;
   display: block;
-  width: 100%;
   height: auto;
   max-width: none;
   pointer-events: none;
   user-select: none;
-  background: transparent;
+  transform-origin: center;
   opacity: var(--bruise-opacity, .78);
+  mix-blend-mode: multiply;
   animation: bruise-settle var(--bruise-in, 5s) cubic-bezier(.12, .7, .22, 1) forwards;
 }
 @keyframes bruise-settle {
   0% {
     filter: saturate(.42) contrast(.82) blur(7px);
-    transform: scale(1.04);
+    transform: var(--bruise-transform) scale(1.04);
   }
   28% {
     filter: saturate(.7) contrast(.9) blur(3.4px);
@@ -77,15 +57,19 @@ body {
     filter: saturate(.9) contrast(1.02) blur(1.6px);
   }
   100% {
-    filter: saturate(.96) contrast(1.06) blur(1px);
-    transform: scale(1);
+    filter: saturate(.98) contrast(1.08) blur(0.85px);
+    transform: var(--bruise-transform) scale(1);
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .bruise {
-    animation-duration: 1.8s;
+    animation: none;
+    opacity: var(--bruise-opacity, .78);
+    filter: saturate(.98) contrast(1.08) blur(0.85px);
+    transform: var(--bruise-transform);
   }
 }
 @media (max-width: 700px) {
+  #skin-world { background-size: 210vw auto; }
   #clear-bruises { top: 10px; font-size: 9px; padding: 8px 9px; }
 }
