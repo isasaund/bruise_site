@@ -352,7 +352,8 @@
     for (let attempt = 0; attempt < 6; attempt += 1) {
       const primary = nextUnused(sources);
       const extraCount = Math.random() < 0.35 ? 2 : 1;
-      const size = Math.round(randomBetween(90, 430));
+      const view = Math.min(window.innerWidth || 390, window.innerHeight || 844);
+      const size = Math.round(randomBetween(view * 0.23, view * 1.12));
       canvas = document.createElement("canvas");
       canvas.width = size;
       canvas.height = size;
