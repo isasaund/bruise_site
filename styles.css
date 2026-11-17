@@ -43,18 +43,18 @@ body {
   transform-origin: center;
   opacity: var(--bruise-opacity, .78);
   mix-blend-mode: multiply;
-  animation: bruise-settle var(--bruise-in, 5s) cubic-bezier(.12, .7, .22, 1) forwards;
+  animation: bruise-settle var(--bruise-in, 6s) cubic-bezier(.42, .08, .2, 1) forwards;
 }
 @keyframes bruise-settle {
   0% {
     filter: saturate(.42) contrast(.82) blur(7px);
     transform: var(--bruise-transform) scale(1.04);
   }
-  28% {
-    filter: saturate(.7) contrast(.9) blur(3.4px);
+  40% {
+    filter: saturate(.68) contrast(.9) blur(3.6px);
   }
-  62% {
-    filter: saturate(.9) contrast(1.02) blur(1.6px);
+  75% {
+    filter: saturate(.88) contrast(1.01) blur(1.7px);
   }
   100% {
     filter: saturate(.98) contrast(1.08) blur(0.85px);
@@ -63,10 +63,7 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .bruise {
-    animation: none;
-    opacity: var(--bruise-opacity, .78);
-    filter: saturate(.98) contrast(1.08) blur(0.85px);
-    transform: var(--bruise-transform);
+    animation-duration: 2.2s;
   }
 }
 @media (max-width: 700px) {

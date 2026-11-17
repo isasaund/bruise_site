@@ -20,6 +20,11 @@
   ];
 
   const randomBetween = (min, max) => Math.random() * (max - min) + min;
+  const clamp01 = (t) => (t < 0 ? 0 : t > 1 ? 1 : t);
+  const smoothstep = (t) => {
+    const x = clamp01(t);
+    return x * x * (3 - 2 * x);
+  };
 
   function knockOutPaper(imageData) {
     const d = imageData.data;
@@ -399,7 +404,7 @@
       const cover = a / 255;
       const edge = Math.pow(Math.max(0, 1 - cover * (0.32 + darkness * 0.68)), 1.15);
       const mottle = Math.abs(Math.sin(p * 12.9898) * 43758.5453) % 1;
-      delay[p] = 0.12 + (1 - edge) * 0.58 + mottle * 0.12;
+      delay[p] = (1 - edge) * 0.14 + mottle * 0.04;
 
       const gMix = 0.3 + edge * 0.42;
       green[i] = r * (1 - gMix) + (138 + ochre) * gMix;
@@ -438,6 +443,7 @@
       }
       last = now;
       const t = Math.min(1, (now - start) / duration);
+      const global = smoothstep(t);
       for (let i = 0, p = 0; i < src.length; i += 4, p += 1) {
         const a = src[i + 3];
         if (!a) {
@@ -448,18 +454,7 @@
           continue;
         }
         const wait = delay[p];
-        const span = Math.max(0.32, 1 - wait * 0.42);
-        let local = (t - wait) / span;
-        if (local < 0) local = 0;
-        else if (local > 1) local = 1;
-        const s = local * local * (3 - 2 * local);
-        if (s === 0) {
-          out[i] = src[i];
-          out[i + 1] = src[i + 1];
-          out[i + 2] = src[i + 2];
-          out[i + 3] = a;
-          continue;
-        }
+        const s = Math.max(global * 0.55, smoothstep((t - wait * 0.35) / (1 - wait * 0.2)));
         let fromR;
         let fromG;
         let fromB;
@@ -469,8 +464,8 @@
         let toB;
         let toA;
         let u;
-        if (s < 0.28) {
-          u = s / 0.28;
+        if (s < 0.4) {
+          u = s / 0.4;
           fromR = src[i];
           fromG = src[i + 1];
           fromB = src[i + 2];
@@ -480,7 +475,7 @@
           toB = green[i + 2];
           toA = green[i + 3];
         } else {
-          u = (s - 0.28) / 0.72;
+          u = (s - 0.4) / 0.6;
           fromR = green[i];
           fromG = green[i + 1];
           fromB = green[i + 2];
@@ -490,15 +485,13 @@
           toB = yellow[i + 2];
           toA = yellow[i + 3];
         }
-        const ease = u * u * (3 - 2 * u);
-        out[i] = fromR + (toR - fromR) * ease;
-        out[i + 1] = fromG + (toG - fromG) * ease;
-        out[i + 2] = fromB + (toB - fromB) * ease;
-        out[i + 3] = fromA + (toA - fromA) * ease;
+        out[i] = fromR + (toR - fromR) * u;
+        out[i + 1] = fromG + (toG - fromG) * u;
+        out[i + 2] = fromB + (toB - fromB) * u;
+        out[i + 3] = fromA + (toA - fromA) * u;
       }
       ctx.putImageData(frame, 0, 0);
-      const fadeT = Math.max(0, (t - 0.16) / 0.84);
-      canvas.style.setProperty("--bruise-opacity", (baseOp * (1 - 0.1 * fadeT)).toFixed(3));
+      canvas.style.setProperty("--bruise-opacity", (baseOp * (1 - 0.1 * global)).toFixed(3));
       if (t < 1) {
         raf = requestAnimationFrame(tick);
         canvas._healRaf = raf;
@@ -516,10 +509,9 @@
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     const final = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const src = final.data;
-    if (reduce) return;
     const frame = ctx.createImageData(canvas.width, canvas.height);
     const out = frame.data;
-    const duration = randomBetween(4200, 6400);
+    const duration = reduce ? randomBetween(2800, 3600) : randomBetween(5200, 7800);
     const start = performance.now();
     const yellowWait = randomBetween(72000, 88000);
     let raf = 0;
@@ -537,6 +529,7 @@
 
     const tick = (now) => {
       const t = Math.min(1, (now - start) / duration);
+      const global = smoothstep(t);
       for (let i = 0; i < src.length; i += 4) {
         const a = src[i + 3];
         if (!a) {
@@ -551,20 +544,16 @@
         const b = src[i + 2];
         const lum = (r * 0.32 + g * 0.5 + b * 0.18) / 255;
         const darkness = 1 - lum;
-        const delay = 0.08 + darkness * 0.58;
-        const span = Math.max(0.28, 1 - delay * 0.5);
-        let local = (t - delay) / span;
-        if (local < 0) local = 0;
-        else if (local > 1) local = 1;
-        const p = local * local * (3 - 2 * local);
+        const lagged = (t - darkness * 0.06) / (1 - darkness * 0.04);
+        const p = Math.max(global * 0.5, smoothstep(lagged));
         const earlyR = r * 0.42 + 228 * 0.58;
         const earlyG = g * 0.38 + 188 * 0.62;
         const earlyB = b * 0.28 + 152 * 0.72;
-        const deepen = 1 - darkness * 0.34 * p * p;
+        const deepen = 1 - darkness * 0.34 * p;
         out[i] = Math.max(0, Math.min(255, (earlyR + (r - earlyR) * p) * deepen));
         out[i + 1] = Math.max(0, Math.min(255, (earlyG + (g - earlyG) * p) * deepen));
         out[i + 2] = Math.max(0, Math.min(255, (earlyB + (b - earlyB) * p) * deepen));
-        out[i + 3] = Math.round(a * (0.05 + 0.95 * p));
+        out[i + 3] = Math.round(a * (0.16 + 0.84 * p));
       }
       ctx.putImageData(frame, 0, 0);
       if (t < 1) raf = requestAnimationFrame(tick);
@@ -588,7 +577,7 @@
     bruise.className = "bruise placed-bruise";
     bruise.style.setProperty("--bruise-opacity", randomBetween(0.7, 0.86).toFixed(2));
     bruise.style.setProperty("--bruise-transform", placedTransform);
-    bruise.style.setProperty("--bruise-in", `${randomBetween(4.4, 6.2).toFixed(2)}s`);
+    bruise.style.setProperty("--bruise-in", `${randomBetween(5.2, 7.6).toFixed(2)}s`);
     Object.assign(bruise.style, {
       position: "absolute",
       display: "block",
