@@ -26,23 +26,14 @@
     return x * x * (3 - 2 * x);
   };
 
-  let skinMap = null;
+  let skinImage = null;
+  let inkScratch = null;
 
   function loadSkinMap() {
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
-        const c = document.createElement("canvas");
-        c.width = img.naturalWidth;
-        c.height = img.naturalHeight;
-        const ctx = c.getContext("2d", { willReadFrequently: true });
-        ctx.drawImage(img, 0, 0);
-        try {
-          const id = ctx.getImageData(0, 0, c.width, c.height);
-          skinMap = { pix: id.data, w: c.width, h: c.height };
-        } catch (err) {
-          skinMap = null;
-        }
+        skinImage = img;
         resolve();
       };
       img.onerror = () => resolve();
@@ -61,71 +52,117 @@
       return Number.isFinite(n) && n > 0 ? n : fallback;
     };
     const tileW = parseLen(parts[0], window.innerWidth * 1.7);
-    const fallbackH = skinMap ? tileW * (skinMap.h / skinMap.w) : tileW;
-    const tileH = parseLen(parts[1], fallbackH);
+    const ratio = skinImage
+      ? skinImage.naturalHeight / skinImage.naturalWidth
+      : 1;
+    const tileH = parseLen(parts[1], tileW * ratio);
     return { tileW, tileH };
   }
 
-  function sampleSkin(wx, wy, tileW, tileH) {
-    const u = (((wx % tileW) + tileW) % tileW) / tileW * (skinMap.w - 1);
-    const v = (((wy % tileH) + tileH) % tileH) / tileH * (skinMap.h - 1);
-    const x0 = Math.floor(u);
-    const y0 = Math.floor(v);
-    const x1 = Math.min(skinMap.w - 1, x0 + 1);
-    const y1 = Math.min(skinMap.h - 1, y0 + 1);
-    const fx = u - x0;
-    const fy = v - y0;
-    const pix = skinMap.pix;
-    const at = (x, y) => (y * skinMap.w + x) * 4;
-    const i00 = at(x0, y0);
-    const i10 = at(x1, y0);
-    const i01 = at(x0, y1);
-    const i11 = at(x1, y1);
-    const mix = (a, b, t) => a + (b - a) * t;
-    return [
-      mix(mix(pix[i00], pix[i10], fx), mix(pix[i01], pix[i11], fx), fy),
-      mix(mix(pix[i00 + 1], pix[i10 + 1], fx), mix(pix[i01 + 1], pix[i11 + 1], fx), fy),
-      mix(mix(pix[i00 + 2], pix[i10 + 2], fx), mix(pix[i01 + 2], pix[i11 + 2], fx), fy)
-    ];
+  function getInkScratch(w, h) {
+    if (!inkScratch || inkScratch.width !== w || inkScratch.height !== h) {
+      inkScratch = document.createElement("canvas");
+      inkScratch.width = w;
+      inkScratch.height = h;
+    }
+    return inkScratch;
   }
 
-  function presentInk(ctx, ink) {
-    if (!skinMap) {
-      ctx.putImageData(ink, 0, 0);
-      return;
-    }
-    const canvas = ctx.canvas;
-    const w = ink.width;
-    const h = ink.height;
-    const src = ink.data;
-    const out = ctx.createImageData(w, h);
-    const dst = out.data;
+  function drawAlignedSkin(ctx, canvas) {
     const { tileW, tileH } = skinTileSize();
     const ox = canvas._ox || 0;
     const oy = canvas._oy || 0;
     const rad = (canvas._rot || 0) * Math.PI / 180;
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
-    for (let y = 0; y < h; y += 1) {
-      for (let x = 0; x < w; x += 1) {
-        const p = (y * w + x) * 4;
-        const a = src[p + 3];
-        if (!a) continue;
-        const lx = x - w / 2;
-        const ly = y - h / 2;
-        const s = sampleSkin(
-          ox + lx * cos - ly * sin,
-          oy + lx * sin + ly * cos,
-          tileW,
-          tileH
-        );
-        dst[p] = src[p] * s[0] / 255;
-        dst[p + 1] = src[p + 1] * s[1] / 255;
-        dst[p + 2] = src[p + 2] * s[2] / 255;
-        dst[p + 3] = a;
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.save();
+    ctx.setTransform(
+      cos,
+      -sin,
+      sin,
+      cos,
+      w / 2 - ox * cos - oy * sin,
+      h / 2 + ox * sin - oy * cos
+    );
+    if (!(tileW > 1 && tileH > 1)) {
+      ctx.restore();
+      return;
+    }
+    const pad = Math.hypot(w, h);
+    const x0 = Math.floor((ox - pad) / tileW) * tileW;
+    const y0 = Math.floor((oy - pad) / tileH) * tileH;
+    const x1 = ox + pad;
+    const y1 = oy + pad;
+    for (let ty = y0; ty < y1; ty += tileH) {
+      for (let tx = x0; tx < x1; tx += tileW) {
+        ctx.drawImage(skinImage, tx, ty, tileW, tileH);
       }
     }
-    ctx.putImageData(out, 0, 0);
+    ctx.restore();
+  }
+
+  function presentInk(ctx, ink) {
+    const canvas = ctx.canvas;
+    const w = ink.width;
+    const h = ink.height;
+    const scratch = getInkScratch(w, h);
+    scratch.getContext("2d").putImageData(ink, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.clearRect(0, 0, w, h);
+    if (skinImage) {
+      drawAlignedSkin(ctx, canvas);
+      ctx.globalCompositeOperation = "multiply";
+      ctx.drawImage(scratch, 0, 0);
+      ctx.globalCompositeOperation = "destination-in";
+      ctx.drawImage(scratch, 0, 0);
+      ctx.globalCompositeOperation = "source-over";
+      return;
+    }
+    ctx.putImageData(ink, 0, 0);
+  }
+
+  function blurCanvas(canvas, radius) {
+    const r = Math.max(1, Math.round(radius));
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const src = img.data;
+    const tmp = new Uint8ClampedArray(src.length);
+    boxBlurPass(src, tmp, canvas.width, canvas.height, r, true);
+    boxBlurPass(tmp, src, canvas.width, canvas.height, r, false);
+    ctx.putImageData(img, 0, 0);
+    return canvas;
+  }
+
+  function boxBlurPass(src, dst, w, h, radius, horiz) {
+    if (horiz) {
+      for (let y = 0; y < h; y += 1) {
+        const row = y * w * 4;
+        for (let c = 0; c < 4; c += 1) {
+          const prefix = new Float32Array(w + 1);
+          for (let x = 0; x < w; x += 1) prefix[x + 1] = prefix[x] + src[row + x * 4 + c];
+          for (let x = 0; x < w; x += 1) {
+            const x0 = x - radius < 0 ? 0 : x - radius;
+            const x1 = x + radius + 1 > w ? w : x + radius + 1;
+            dst[row + x * 4 + c] = (prefix[x1] - prefix[x0]) / (x1 - x0);
+          }
+        }
+      }
+      return;
+    }
+    for (let x = 0; x < w; x += 1) {
+      for (let c = 0; c < 4; c += 1) {
+        const prefix = new Float32Array(h + 1);
+        for (let y = 0; y < h; y += 1) prefix[y + 1] = prefix[y] + src[(y * w + x) * 4 + c];
+        for (let y = 0; y < h; y += 1) {
+          const y0 = y - radius < 0 ? 0 : y - radius;
+          const y1 = y + radius + 1 > h ? h : y + radius + 1;
+          dst[(y * w + x) * 4 + c] = (prefix[y1] - prefix[y0]) / (y1 - y0);
+        }
+      }
+    }
   }
 
   function knockOutPaper(imageData) {
@@ -183,20 +220,30 @@
     const out = document.createElement("canvas");
     out.width = w + pad * 2;
     out.height = h + pad * 2;
-    const ctx = out.getContext("2d");
-    ctx.filter = `blur(${(radius * 1.35).toFixed(1)}px)`;
-    ctx.globalAlpha = 0.62;
-    ctx.drawImage(canvas, pad, pad);
-    ctx.filter = `blur(${(radius * 0.28).toFixed(1)}px)`;
-    ctx.globalAlpha = 0.92;
-    ctx.drawImage(canvas, pad, pad);
+    const ctx = out.getContext("2d", { willReadFrequently: true });
+    const soft = document.createElement("canvas");
+    soft.width = out.width;
+    soft.height = out.height;
+    const sctx = soft.getContext("2d", { willReadFrequently: true });
+    sctx.globalAlpha = 0.62;
+    sctx.drawImage(canvas, pad, pad);
+    blurCanvas(soft, radius * 1.35);
+    const core = document.createElement("canvas");
+    core.width = out.width;
+    core.height = out.height;
+    const cctx = core.getContext("2d", { willReadFrequently: true });
+    cctx.globalAlpha = 0.92;
+    cctx.drawImage(canvas, pad, pad);
+    blurCanvas(core, radius * 0.28);
+    ctx.drawImage(soft, 0, 0);
+    ctx.drawImage(core, 0, 0);
 
     const halo = document.createElement("canvas");
     halo.width = out.width;
     halo.height = out.height;
-    const hctx = halo.getContext("2d");
-    hctx.filter = `blur(${Math.max(8, radius * 0.9).toFixed(1)}px)`;
+    const hctx = halo.getContext("2d", { willReadFrequently: true });
     hctx.drawImage(out, 0, 0);
+    blurCanvas(halo, Math.max(8, radius * 0.9));
     const image = ctx.getImageData(0, 0, out.width, out.height);
     const fade = hctx.getImageData(0, 0, out.width, out.height).data;
     const d = image.data;
@@ -368,7 +415,7 @@
     const canvas = document.createElement("canvas");
     canvas.width = size;
     canvas.height = size;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
     ctx.fillStyle = "#fff";
     const cx = size / 2 + randomBetween(-size * 0.08, size * 0.08);
     const cy = size / 2 + randomBetween(-size * 0.08, size * 0.08);
@@ -397,8 +444,7 @@
         size * randomBetween(0.07, 0.14)
       );
     }
-    ctx.filter = `blur(${Math.max(10, size * 0.07).toFixed(1)}px)`;
-    ctx.drawImage(canvas, 0, 0);
+    blurCanvas(canvas, Math.max(10, size * 0.07));
     return canvas;
   }
 

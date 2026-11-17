@@ -41,6 +41,7 @@ body {
   background: transparent;
   transform: var(--bruise-transform);
   transform-origin: center;
+  animation: bruise-filter var(--bruise-in, 6s) cubic-bezier(.42, .08, .2, 1) forwards;
 }
 .bruise {
   display: block;
@@ -51,25 +52,20 @@ body {
   user-select: none;
   background: transparent;
   opacity: var(--bruise-opacity, .78);
-  animation: bruise-settle var(--bruise-in, 6s) cubic-bezier(.42, .08, .2, 1) forwards;
+  animation: bruise-scale var(--bruise-in, 6s) cubic-bezier(.42, .08, .2, 1) forwards;
 }
-@keyframes bruise-settle {
-  0% {
-    filter: saturate(.42) contrast(.82) blur(7px);
-    transform: scale(1.04);
-  }
-  40% {
-    filter: saturate(.68) contrast(.9) blur(3.6px);
-  }
-  75% {
-    filter: saturate(.88) contrast(1.01) blur(1.7px);
-  }
-  100% {
-    filter: saturate(.98) contrast(1.08) blur(0.85px);
-    transform: scale(1);
-  }
+@keyframes bruise-filter {
+  0% { filter: saturate(.42) contrast(.82) blur(7px); }
+  40% { filter: saturate(.68) contrast(.9) blur(3.6px); }
+  75% { filter: saturate(.88) contrast(1.01) blur(1.7px); }
+  100% { filter: saturate(.98) contrast(1.08) blur(0.85px); }
+}
+@keyframes bruise-scale {
+  0% { transform: scale(1.04); }
+  100% { transform: scale(1); }
 }
 @media (prefers-reduced-motion: reduce) {
+  .bruise-wrap,
   .bruise {
     animation-duration: 2.2s;
   }
