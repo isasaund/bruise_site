@@ -25,6 +25,10 @@
     const x = clamp01(t);
     return x * x * (3 - 2 * x);
   };
+  const smootherstep = (t) => {
+    const x = clamp01(t);
+    return x * x * x * (x * (x * 6 - 15) + 10);
+  };
 
   function presentInk(ctx, ink, skipRestamp) {
     const canvas = ctx.canvas;
@@ -78,7 +82,7 @@
     const i11 = at(x1, y1);
     const mix = (p, q, t) => p + (q - p) * t;
     const a = mix(mix(pix[i00 + 3], pix[i10 + 3], fx), mix(pix[i01 + 3], pix[i11 + 3], fx), fy);
-    if (a < 10) return null;
+    if (a < 1) return null;
     return [
       mix(mix(pix[i00], pix[i10], fx), mix(pix[i01], pix[i11], fx), fy),
       mix(mix(pix[i00 + 1], pix[i10 + 1], fx), mix(pix[i01 + 1], pix[i11 + 1], fx), fy),
@@ -127,24 +131,24 @@
           mixG += s[1] * wgt;
           mixB += s[2] * wgt;
         }
-        if (cover < 12) continue;
-        const t = Math.min(1, cover / 220);
+        if (cover < 1) continue;
+        const t = smootherstep(Math.min(1, cover / 240));
         const oR = mixR / cover;
         const oG = mixG / cover;
         const oB = mixB / cover;
-        let r = src[p] * (1 - 0.38 * t) + (src[p] * oR / 255) * 0.38 * t;
-        let g = src[p + 1] * (1 - 0.38 * t) + (src[p + 1] * oG / 255) * 0.38 * t;
-        let b = src[p + 2] * (1 - 0.38 * t) + (src[p + 2] * oB / 255) * 0.38 * t;
+        let r = src[p] * (1 - 0.32 * t) + (src[p] * oR / 255) * 0.32 * t;
+        let g = src[p + 1] * (1 - 0.32 * t) + (src[p + 1] * oG / 255) * 0.32 * t;
+        let b = src[p + 2] * (1 - 0.32 * t) + (src[p + 2] * oB / 255) * 0.32 * t;
         const hsl = rgbToHsl(r / 255, g / 255, b / 255);
         const rgb = hslToRgb(
-          (hsl[0] + 1 - 0.025 * t) % 1,
-          Math.min(1, hsl[1] * (1.28 + 0.55 * t)),
-          Math.max(0.05, hsl[2] * (1 - 0.32 * t))
+          hsl[0],
+          Math.min(1, hsl[1] * (1 + 0.42 * t)),
+          Math.max(0.05, hsl[2] * (1 - 0.24 * t))
         );
-        dst[p] = rgb[0];
-        dst[p + 1] = rgb[1];
-        dst[p + 2] = rgb[2];
-        dst[p + 3] = Math.min(255, a * (1 + 0.22 * t));
+        dst[p] = src[p] + (rgb[0] - src[p]) * t;
+        dst[p + 1] = src[p + 1] + (rgb[1] - src[p + 1]) * t;
+        dst[p + 2] = src[p + 2] + (rgb[2] - src[p + 2]) * t;
+        dst[p + 3] = a + (Math.min(255, a * (1 + 0.18 * t)) - a) * t;
       }
     }
     return out;
@@ -152,15 +156,24 @@
 
   let bruiseSeq = 1;
 
+  function overlapStillEasing(canvas) {
+    const others = overlappingCanvases(canvas);
+    for (let i = 0; i < others.length; i += 1) {
+      if (pairEase(canvas, others[i]) < 0.999) return true;
+      if (pairEase(others[i], canvas) < 0.999) return true;
+    }
+    return false;
+  }
+
   function pairEase(canvas, other) {
     if (!other._bid) other._bid = bruiseSeq++;
     if (!canvas._pairT) canvas._pairT = Object.create(null);
     let st = canvas._pairT[other._bid];
     const now = performance.now();
     if (!st) {
-      st = canvas._pairT[other._bid] = { start: now, dur: 5200 };
+      st = canvas._pairT[other._bid] = { start: now, dur: 6400 };
     }
-    return smoothstep((now - st.start) / st.dur);
+    return smootherstep((now - st.start) / st.dur);
   }
 
   function blurCanvas(canvas, radius) {
@@ -591,7 +604,7 @@
       const cover = a / 255;
       const edge = Math.pow(Math.max(0, 1 - cover * (0.32 + darkness * 0.68)), 1.15);
       const mottle = Math.abs(Math.sin(p * 12.9898) * 43758.5453) % 1;
-      delay[p] = (1 - edge) * 0.14 + mottle * 0.04;
+      delay[p] = (1 - edge) * 0.08 + mottle * 0.015;
 
       const gMix = 0.3 + edge * 0.42;
       green[i] = r * (1 - gMix) + (138 + ochre) * gMix;
@@ -619,18 +632,11 @@
     const duration = randomBetween(82000, 128000);
     const start = performance.now();
     const baseOp = parseFloat(canvas.style.getPropertyValue("--bruise-opacity")) || 0.78;
-    let last = 0;
     let raf = 0;
 
     const tick = (now) => {
-      if (now - last < 80) {
-        raf = requestAnimationFrame(tick);
-        canvas._healRaf = raf;
-        return;
-      }
-      last = now;
       const t = Math.min(1, (now - start) / duration);
-      const global = smoothstep(t);
+      const global = smootherstep(t);
       for (let i = 0, p = 0; i < src.length; i += 4, p += 1) {
         const a = src[i + 3];
         if (!a) {
@@ -641,9 +647,9 @@
           continue;
         }
         const wait = delay[p];
-        const s = Math.max(global * 0.55, smoothstep((t - wait * 0.35) / (1 - wait * 0.2)));
-        const toGreen = smoothstep(s / 0.48);
-        const toYellow = smoothstep((s - 0.32) / 0.68);
+        const s = Math.max(global * 0.82, smootherstep((t - wait * 0.22) / (1 - wait * 0.12)));
+        const toGreen = smootherstep(s / 0.55);
+        const toYellow = smootherstep((s - 0.28) / 0.72);
         const gR = src[i] + (green[i] - src[i]) * toGreen;
         const gG = src[i + 1] + (green[i + 1] - src[i + 1]) * toGreen;
         const gB = src[i + 2] + (green[i + 2] - src[i + 2]) * toGreen;
@@ -654,7 +660,7 @@
         out[i + 3] = gA + (yellow[i + 3] - gA) * toYellow;
       }
       presentInk(ctx, frame);
-      canvas.style.setProperty("--bruise-opacity", (baseOp * (1 - 0.1 * global)).toFixed(3));
+      canvas.style.setProperty("--bruise-opacity", String(baseOp * (1 - 0.1 * global)));
       if (t < 1) {
         raf = requestAnimationFrame(tick);
         canvas._healRaf = raf;
@@ -692,7 +698,7 @@
 
     const tick = (now) => {
       const t = Math.min(1, (now - start) / duration);
-      const global = smoothstep(t);
+      const global = smootherstep(t);
       for (let i = 0; i < src.length; i += 4) {
         const a = src[i + 3];
         if (!a) {
@@ -707,8 +713,8 @@
         const b = src[i + 2];
         const lum = (r * 0.32 + g * 0.5 + b * 0.18) / 255;
         const darkness = 1 - lum;
-        const lagged = (t - darkness * 0.06) / (1 - darkness * 0.04);
-        const p = Math.max(global * 0.5, smoothstep(lagged));
+        const lagged = (t - darkness * 0.05) / (1 - darkness * 0.03);
+        const p = Math.max(global * 0.72, smootherstep(lagged));
         const earlyR = r * 0.42 + 228 * 0.58;
         const earlyG = g * 0.38 + 188 * 0.62;
         const earlyB = b * 0.28 + 152 * 0.72;
@@ -716,10 +722,10 @@
         out[i] = Math.max(0, Math.min(255, (earlyR + (r - earlyR) * p) * deepen));
         out[i + 1] = Math.max(0, Math.min(255, (earlyG + (g - earlyG) * p) * deepen));
         out[i + 2] = Math.max(0, Math.min(255, (earlyB + (b - earlyB) * p) * deepen));
-        out[i + 3] = Math.round(a * (0.16 + 0.84 * p));
+        out[i + 3] = a * p;
       }
       presentInk(ctx, frame);
-      if (t < 1) raf = requestAnimationFrame(tick);
+      if (t < 1 || overlapStillEasing(canvas)) raf = requestAnimationFrame(tick);
       else {
         raf = 0;
         const remain = Math.max(400, yellowWait - (performance.now() - start));
