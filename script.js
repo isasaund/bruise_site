@@ -215,8 +215,8 @@
   function featherRim(canvas) {
     const w = canvas.width;
     const h = canvas.height;
-    const radius = Math.max(10, Math.min(22, Math.round(Math.min(w, h) * 0.075)));
-    const pad = Math.ceil(radius * 2.6);
+    const radius = Math.max(12, Math.min(26, Math.round(Math.min(w, h) * 0.09)));
+    const pad = Math.ceil(radius * 2.8);
     const out = document.createElement("canvas");
     out.width = w + pad * 2;
     out.height = h + pad * 2;
@@ -227,7 +227,7 @@
     const sctx = soft.getContext("2d", { willReadFrequently: true });
     sctx.globalAlpha = 0.62;
     sctx.drawImage(canvas, pad, pad);
-    blurCanvas(soft, radius * 1.35);
+    blurCanvas(soft, radius * 1.5);
     const core = document.createElement("canvas");
     core.width = out.width;
     core.height = out.height;
@@ -243,15 +243,15 @@
     halo.height = out.height;
     const hctx = halo.getContext("2d", { willReadFrequently: true });
     hctx.drawImage(out, 0, 0);
-    blurCanvas(halo, Math.max(8, radius * 0.9));
+    blurCanvas(halo, Math.max(10, radius * 1.05));
     const image = ctx.getImageData(0, 0, out.width, out.height);
     const fade = hctx.getImageData(0, 0, out.width, out.height).data;
     const d = image.data;
     for (let i = 0; i < d.length; i += 4) {
       if (!d[i + 3]) continue;
       const t = fade[i + 3] / 255;
-      const edge = t > 0.82 ? 1 : Math.pow(t / 0.82, 1.45);
-      d[i + 3] = Math.round(d[i + 3] * edge * 0.9);
+      const edge = t > 0.76 ? 1 : Math.pow(t / 0.76, 1.55);
+      d[i + 3] = Math.round(d[i + 3] * edge * 0.86);
     }
     ctx.putImageData(image, 0, 0);
     return out;
@@ -444,7 +444,7 @@
         size * randomBetween(0.07, 0.14)
       );
     }
-    blurCanvas(canvas, Math.max(10, size * 0.07));
+    blurCanvas(canvas, Math.max(12, size * 0.09));
     return canvas;
   }
 

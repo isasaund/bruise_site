@@ -57,8 +57,8 @@ body {
 @keyframes bruise-filter {
   0% { filter: saturate(.42) contrast(.82) blur(7px); }
   40% { filter: saturate(.68) contrast(.9) blur(3.6px); }
-  75% { filter: saturate(.88) contrast(1.01) blur(1.7px); }
-  100% { filter: saturate(.98) contrast(1.08) blur(0.85px); }
+  75% { filter: saturate(.88) contrast(1.01) blur(2.1px); }
+  100% { filter: saturate(.98) contrast(1.08) blur(1.2px); }
 }
 @keyframes bruise-scale {
   0% { transform: scale(1.04); }
