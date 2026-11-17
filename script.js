@@ -120,10 +120,12 @@
         for (let i = 0; i < others.length; i += 1) {
           const s = sampleInk(others[i], wx, wy);
           if (!s) continue;
-          cover += s[3];
-          mixR += s[0] * s[3];
-          mixG += s[1] * s[3];
-          mixB += s[2] * s[3];
+          const ease = pairEase(canvas, others[i]);
+          const wgt = s[3] * ease;
+          cover += wgt;
+          mixR += s[0] * wgt;
+          mixG += s[1] * wgt;
+          mixB += s[2] * wgt;
         }
         if (cover < 12) continue;
         const t = Math.min(1, cover / 220);
@@ -146,6 +148,19 @@
       }
     }
     return out;
+  }
+
+  let bruiseSeq = 1;
+
+  function pairEase(canvas, other) {
+    if (!other._bid) other._bid = bruiseSeq++;
+    if (!canvas._pairT) canvas._pairT = Object.create(null);
+    let st = canvas._pairT[other._bid];
+    const now = performance.now();
+    if (!st) {
+      st = canvas._pairT[other._bid] = { start: now, dur: 5200 };
+    }
+    return smoothstep((now - st.start) / st.dur);
   }
 
   function blurCanvas(canvas, radius) {
@@ -627,40 +642,16 @@
         }
         const wait = delay[p];
         const s = Math.max(global * 0.55, smoothstep((t - wait * 0.35) / (1 - wait * 0.2)));
-        let fromR;
-        let fromG;
-        let fromB;
-        let fromA;
-        let toR;
-        let toG;
-        let toB;
-        let toA;
-        let u;
-        if (s < 0.4) {
-          u = s / 0.4;
-          fromR = src[i];
-          fromG = src[i + 1];
-          fromB = src[i + 2];
-          fromA = a;
-          toR = green[i];
-          toG = green[i + 1];
-          toB = green[i + 2];
-          toA = green[i + 3];
-        } else {
-          u = (s - 0.4) / 0.6;
-          fromR = green[i];
-          fromG = green[i + 1];
-          fromB = green[i + 2];
-          fromA = green[i + 3];
-          toR = yellow[i];
-          toG = yellow[i + 1];
-          toB = yellow[i + 2];
-          toA = yellow[i + 3];
-        }
-        out[i] = fromR + (toR - fromR) * u;
-        out[i + 1] = fromG + (toG - fromG) * u;
-        out[i + 2] = fromB + (toB - fromB) * u;
-        out[i + 3] = fromA + (toA - fromA) * u;
+        const toGreen = smoothstep(s / 0.48);
+        const toYellow = smoothstep((s - 0.32) / 0.68);
+        const gR = src[i] + (green[i] - src[i]) * toGreen;
+        const gG = src[i + 1] + (green[i + 1] - src[i + 1]) * toGreen;
+        const gB = src[i + 2] + (green[i + 2] - src[i + 2]) * toGreen;
+        const gA = a + (green[i + 3] - a) * toGreen;
+        out[i] = gR + (yellow[i] - gR) * toYellow;
+        out[i + 1] = gG + (yellow[i + 1] - gG) * toYellow;
+        out[i + 2] = gB + (yellow[i + 2] - gB) * toYellow;
+        out[i + 3] = gA + (yellow[i + 3] - gA) * toYellow;
       }
       presentInk(ctx, frame);
       canvas.style.setProperty("--bruise-opacity", (baseOp * (1 - 0.1 * global)).toFixed(3));
@@ -758,6 +749,7 @@
       height: `${bruise.height}px`
     });
     bruise.className = "bruise placed-bruise";
+    bruise._bid = bruiseSeq++;
     bruise._ox = x;
     bruise._oy = y;
     bruise._rot = rotation;
