@@ -353,7 +353,7 @@
       const primary = nextUnused(sources);
       const extraCount = Math.random() < 0.35 ? 2 : 1;
       const view = Math.min(window.innerWidth || 390, window.innerHeight || 844);
-      const size = Math.round(randomBetween(view * 0.23, view * 1.12));
+      const size = Math.round(randomBetween(view * 0.48, view * 1.25));
       canvas = document.createElement("canvas");
       canvas.width = size;
       canvas.height = size;
