@@ -77,7 +77,7 @@ body {
     filter: saturate(.9) contrast(1.02) blur(1.6px);
   }
   100% {
-    filter: saturate(.92) contrast(1.02) blur(1.15px);
+    filter: saturate(.96) contrast(1.06) blur(1px);
     transform: scale(1);
   }
 }
