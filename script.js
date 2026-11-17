@@ -512,11 +512,15 @@
   }
 
   function startDevelopment(canvas) {
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    const final = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    let final;
+    try {
+      final = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    } catch (err) {
+      canvas._stopDevelop = () => {};
+      return;
+    }
     const src = final.data;
-    if (reduce) return;
     const frame = ctx.createImageData(canvas.width, canvas.height);
     const out = frame.data;
     const duration = randomBetween(4200, 6400);
@@ -584,24 +588,22 @@
 
   function placeBruise(layer, bruise, x, y) {
     const rotation = randomBetween(-18, 18);
-    const placedTransform = `translate(-50%, -50%) rotate(${rotation}deg)`;
-    bruise.className = "bruise placed-bruise";
-    bruise.style.setProperty("--bruise-opacity", randomBetween(0.7, 0.86).toFixed(2));
-    bruise.style.setProperty("--bruise-transform", placedTransform);
-    bruise.style.setProperty("--bruise-in", `${randomBetween(4.4, 6.2).toFixed(2)}s`);
-    Object.assign(bruise.style, {
-      position: "absolute",
-      display: "block",
-      width: `${bruise.width}px`,
-      height: `${bruise.height}px`,
+    const wrap = document.createElement("div");
+    wrap.className = "bruise-wrap";
+    wrap.style.setProperty("--bruise-rot", `${rotation}deg`);
+    wrap.style.setProperty("--bruise-opacity", randomBetween(0.7, 0.86).toFixed(2));
+    wrap.style.setProperty("--bruise-in", `${randomBetween(4.4, 6.2).toFixed(2)}s`);
+    Object.assign(wrap.style, {
       left: `${x}px`,
       top: `${y}px`,
-      transform: placedTransform,
-      transformOrigin: "center",
-      pointerEvents: "none",
-      userSelect: "none"
+      width: `${bruise.width}px`,
+      height: `${bruise.height}px`
     });
-    layer.appendChild(bruise);
+    bruise.className = "bruise placed-bruise";
+    bruise.style.setProperty("--bruise-opacity", wrap.style.getPropertyValue("--bruise-opacity"));
+    bruise.style.setProperty("--bruise-in", wrap.style.getPropertyValue("--bruise-in"));
+    wrap.appendChild(bruise);
+    layer.appendChild(wrap);
     startDevelopment(bruise);
   }
 

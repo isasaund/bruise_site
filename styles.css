@@ -17,6 +17,7 @@ body {
   background-repeat: repeat;
   background-size: 170vw auto;
   overflow: hidden;
+  isolation: isolate;
 }
 #clear-bruises {
   position: fixed;
@@ -33,22 +34,30 @@ body {
 }
 #clear-bruises:hover { background: rgba(35,20,18,.75); }
 #bruise-layer { position: absolute; inset: 0; pointer-events: none; }
-.bruise {
+.bruise-wrap {
   position: absolute;
+  pointer-events: none;
+  user-select: none;
+  background: transparent;
+  transform: translate(-50%, -50%) rotate(var(--bruise-rot, 0deg));
+  transform-origin: center;
+  mix-blend-mode: multiply;
+}
+.bruise {
   display: block;
+  width: 100%;
   height: auto;
   max-width: none;
   pointer-events: none;
   user-select: none;
-  transform-origin: center;
+  background: transparent;
   opacity: var(--bruise-opacity, .78);
-  mix-blend-mode: multiply;
   animation: bruise-settle var(--bruise-in, 5s) cubic-bezier(.12, .7, .22, 1) forwards;
 }
 @keyframes bruise-settle {
   0% {
     filter: saturate(.42) contrast(.82) blur(7px);
-    transform: var(--bruise-transform) scale(1.04);
+    transform: scale(1.04);
   }
   28% {
     filter: saturate(.7) contrast(.9) blur(3.4px);
@@ -58,15 +67,12 @@ body {
   }
   100% {
     filter: saturate(.98) contrast(1.08) blur(0.85px);
-    transform: var(--bruise-transform) scale(1);
+    transform: scale(1);
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .bruise {
-    animation: none;
-    opacity: var(--bruise-opacity, .78);
-    filter: saturate(.98) contrast(1.08) blur(0.85px);
-    transform: var(--bruise-transform);
+    animation-duration: 1.8s;
   }
 }
 @media (max-width: 700px) {
