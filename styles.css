@@ -33,7 +33,13 @@ body {
   cursor: pointer;
 }
 #clear-bruises:hover { background: rgba(35,20,18,.75); }
-#bruise-layer { position: absolute; inset: 0; pointer-events: none; }
+#bruise-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  isolation: isolate;
+  mix-blend-mode: multiply;
+}
 .bruise-wrap {
   position: absolute;
   pointer-events: none;
@@ -41,7 +47,6 @@ body {
   background: transparent;
   transform: var(--bruise-transform);
   transform-origin: center;
-  mix-blend-mode: multiply;
 }
 .bruise {
   display: block;

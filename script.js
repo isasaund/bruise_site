@@ -118,37 +118,23 @@
         const wx = ox + lx * cos - ly * sin;
         const wy = oy + lx * sin + ly * cos;
         let cover = 0;
-        let mixR = 0;
-        let mixG = 0;
-        let mixB = 0;
         for (let i = 0; i < others.length; i += 1) {
           const s = sampleInk(others[i], wx, wy);
           if (!s) continue;
-          const ease = pairEase(canvas, others[i]);
-          const wgt = s[3] * ease;
-          cover += wgt;
-          mixR += s[0] * wgt;
-          mixG += s[1] * wgt;
-          mixB += s[2] * wgt;
+          cover += s[3] * pairEase(canvas, others[i]);
         }
         if (cover < 1) continue;
         const t = smootherstep(Math.min(1, cover / 240));
-        const oR = mixR / cover;
-        const oG = mixG / cover;
-        const oB = mixB / cover;
-        let r = src[p] * (1 - 0.32 * t) + (src[p] * oR / 255) * 0.32 * t;
-        let g = src[p + 1] * (1 - 0.32 * t) + (src[p + 1] * oG / 255) * 0.32 * t;
-        let b = src[p + 2] * (1 - 0.32 * t) + (src[p + 2] * oB / 255) * 0.32 * t;
-        const hsl = rgbToHsl(r / 255, g / 255, b / 255);
+        const hsl = rgbToHsl(src[p] / 255, src[p + 1] / 255, src[p + 2] / 255);
         const rgb = hslToRgb(
           hsl[0],
-          Math.min(1, hsl[1] * (1 + 0.42 * t)),
-          Math.max(0.05, hsl[2] * (1 - 0.24 * t))
+          Math.min(1, hsl[1] * (1 + 0.2 * t)),
+          Math.min(0.78, hsl[2] * (1 + 0.16 * t))
         );
         dst[p] = src[p] + (rgb[0] - src[p]) * t;
         dst[p + 1] = src[p + 1] + (rgb[1] - src[p + 1]) * t;
         dst[p + 2] = src[p + 2] + (rgb[2] - src[p + 2]) * t;
-        dst[p + 3] = a + (Math.min(255, a * (1 + 0.18 * t)) - a) * t;
+        dst[p + 3] = a;
       }
     }
     return out;
