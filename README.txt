@@ -1,18 +1,13 @@
 BRUISE CLICK GENERATOR
 
-1. Put this whole folder inside your existing website folder.
-2. Put your close-up skin background image in this folder and name it exactly:
-   skin.png
-   (If it has another name, edit the background-image filename in styles.css.)
-3. Open bruiseme.html in your browser.
-4. Click anywhere on the skin to place a random photographic bruise.
-5. Use CLEAR BRUISES to remove all marks.
+This site needs a local web server. Double-clicking bruiseme.html will not
+respond the same way as the Cursor preview.
 
-Files:
-- bruiseme.html
-- styles.css
-- script.js
-- bruises/bruise-purple.png
-- bruises/bruise-fading.png
+To open the working version:
+1. Open the bruise_site folder.
+2. Double-click "Open Bruise Site.command".
+3. If macOS asks, choose Open.
+4. Click the skin to place bruises. Use CLEAR BRUISES to remove them.
 
-The bruise overlays were extracted from the reference photos supplied in this chat.
+The live GitHub page is:
+https://isasaund.github.io/bruise_site/
