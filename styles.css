@@ -41,7 +41,6 @@ body {
   background: transparent;
   transform: var(--bruise-transform);
   transform-origin: center;
-  mix-blend-mode: multiply;
 }
 .bruise {
   display: block;

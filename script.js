@@ -26,6 +26,108 @@
     return x * x * (3 - 2 * x);
   };
 
+  let skinMap = null;
+
+  function loadSkinMap() {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement("canvas");
+        c.width = img.naturalWidth;
+        c.height = img.naturalHeight;
+        const ctx = c.getContext("2d", { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0);
+        try {
+          const id = ctx.getImageData(0, 0, c.width, c.height);
+          skinMap = { pix: id.data, w: c.width, h: c.height };
+        } catch (err) {
+          skinMap = null;
+        }
+        resolve();
+      };
+      img.onerror = () => resolve();
+      img.src = "skin.jpg";
+    });
+  }
+
+  function skinTileSize() {
+    const el = document.querySelector("#skin-world");
+    const parts = (el ? getComputedStyle(el).backgroundSize : "170vw auto").trim().split(/\s+/);
+    const parseLen = (raw, fallback) => {
+      if (!raw || raw === "auto") return fallback;
+      if (raw.endsWith("vw")) return window.innerWidth * (parseFloat(raw) / 100);
+      if (raw.endsWith("vh")) return window.innerHeight * (parseFloat(raw) / 100);
+      const n = parseFloat(raw);
+      return Number.isFinite(n) && n > 0 ? n : fallback;
+    };
+    const tileW = parseLen(parts[0], window.innerWidth * 1.7);
+    const fallbackH = skinMap ? tileW * (skinMap.h / skinMap.w) : tileW;
+    const tileH = parseLen(parts[1], fallbackH);
+    return { tileW, tileH };
+  }
+
+  function sampleSkin(wx, wy, tileW, tileH) {
+    const u = (((wx % tileW) + tileW) % tileW) / tileW * (skinMap.w - 1);
+    const v = (((wy % tileH) + tileH) % tileH) / tileH * (skinMap.h - 1);
+    const x0 = Math.floor(u);
+    const y0 = Math.floor(v);
+    const x1 = Math.min(skinMap.w - 1, x0 + 1);
+    const y1 = Math.min(skinMap.h - 1, y0 + 1);
+    const fx = u - x0;
+    const fy = v - y0;
+    const pix = skinMap.pix;
+    const at = (x, y) => (y * skinMap.w + x) * 4;
+    const i00 = at(x0, y0);
+    const i10 = at(x1, y0);
+    const i01 = at(x0, y1);
+    const i11 = at(x1, y1);
+    const mix = (a, b, t) => a + (b - a) * t;
+    return [
+      mix(mix(pix[i00], pix[i10], fx), mix(pix[i01], pix[i11], fx), fy),
+      mix(mix(pix[i00 + 1], pix[i10 + 1], fx), mix(pix[i01 + 1], pix[i11 + 1], fx), fy),
+      mix(mix(pix[i00 + 2], pix[i10 + 2], fx), mix(pix[i01 + 2], pix[i11 + 2], fx), fy)
+    ];
+  }
+
+  function presentInk(ctx, ink) {
+    if (!skinMap) {
+      ctx.putImageData(ink, 0, 0);
+      return;
+    }
+    const canvas = ctx.canvas;
+    const w = ink.width;
+    const h = ink.height;
+    const src = ink.data;
+    const out = ctx.createImageData(w, h);
+    const dst = out.data;
+    const { tileW, tileH } = skinTileSize();
+    const ox = canvas._ox || 0;
+    const oy = canvas._oy || 0;
+    const rad = (canvas._rot || 0) * Math.PI / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    for (let y = 0; y < h; y += 1) {
+      for (let x = 0; x < w; x += 1) {
+        const p = (y * w + x) * 4;
+        const a = src[p + 3];
+        if (!a) continue;
+        const lx = x - w / 2;
+        const ly = y - h / 2;
+        const s = sampleSkin(
+          ox + lx * cos - ly * sin,
+          oy + lx * sin + ly * cos,
+          tileW,
+          tileH
+        );
+        dst[p] = src[p] * s[0] / 255;
+        dst[p + 1] = src[p + 1] * s[1] / 255;
+        dst[p + 2] = src[p + 2] * s[2] / 255;
+        dst[p + 3] = a;
+      }
+    }
+    ctx.putImageData(out, 0, 0);
+  }
+
   function knockOutPaper(imageData) {
     const d = imageData.data;
     for (let i = 0; i < d.length; i += 4) {
@@ -490,7 +592,7 @@
         out[i + 2] = fromB + (toB - fromB) * u;
         out[i + 3] = fromA + (toA - fromA) * u;
       }
-      ctx.putImageData(frame, 0, 0);
+      presentInk(ctx, frame);
       canvas.style.setProperty("--bruise-opacity", (baseOp * (1 - 0.1 * global)).toFixed(3));
       if (t < 1) {
         raf = requestAnimationFrame(tick);
@@ -555,7 +657,7 @@
         out[i + 2] = Math.max(0, Math.min(255, (earlyB + (b - earlyB) * p) * deepen));
         out[i + 3] = Math.round(a * (0.16 + 0.84 * p));
       }
-      ctx.putImageData(frame, 0, 0);
+      presentInk(ctx, frame);
       if (t < 1) raf = requestAnimationFrame(tick);
       else {
         raf = 0;
@@ -586,6 +688,9 @@
       height: `${bruise.height}px`
     });
     bruise.className = "bruise placed-bruise";
+    bruise._ox = x;
+    bruise._oy = y;
+    bruise._rot = rotation;
     bruise.style.setProperty("--bruise-opacity", wrap.style.getPropertyValue("--bruise-opacity"));
     bruise.style.setProperty("--bruise-in", wrap.style.getPropertyValue("--bruise-in"));
     wrap.appendChild(bruise);
@@ -617,7 +722,7 @@
     if (world.dataset.bruiseClickReady === "true") return;
     world.dataset.bruiseClickReady = "true";
     layer.style.pointerEvents = "none";
-    const sourcesReady = loadSources();
+    const sourcesReady = Promise.all([loadSources(), loadSkinMap()]).then(([sources]) => sources);
 
     world.addEventListener("click", (event) => {
       if (event.target.closest("button, a, input, textarea, select")) return;
